@@ -1,0 +1,58 @@
+<html>
+<head>
+<style>
+body {
+    background-color:#ffe3ac;
+}
+
+.board {
+    height:50px;
+    width:90%;
+    border:solid 1px;
+    padding:0px;
+    background-color:#f0acff;
+}
+
+.board ul {
+    list-style:none;
+    margin:0px;
+    padding:0px;
+    height:100%;
+}
+
+.board ul li {
+    background-color:#accaff;
+    font-size:14px;
+    display:inline-block;
+    margin:0px;
+    margin-right:-5px;
+    margin-top:-1.25px;
+    padding:18px 0 0 0;
+    border:dashed 1px;
+    height:32px;
+    text-align:center;
+    white-space: nowrap; 
+    overflow: hidden;
+}
+</style>
+</head>
+<body>
+    {% for cutlist in cutlists %}
+        <div class="cutlist">
+            <h1>{{ cutlist.name }} Cut List ({{ cutlist.boards|length }} Total Boards)</h1>
+            {% for b in cutlist.boards %}
+                <h3>{{ b.length/12 }} ft (excess = {{ b.excess }} in)</h3>
+                <div class="board">
+
+                    <ul>
+                    {% for c in b.cuts %}
+                        <li style="width: {{ 100 * c.length / b.length }}%">{{ c }}</li>
+                    {% endfor %}
+                    </ul>
+                    
+                </div>
+            {% endfor %}
+        </div>
+    {% endfor %}
+</body>
+</html>
