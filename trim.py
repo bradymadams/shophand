@@ -1,8 +1,11 @@
-from math import *
+import math
 import jinja2
 
-CASING_SIDE_W = 5.25
+import shophand
+
+CASING_SIDE_W = 5.125
 CASING_HEAD_W = 5.5
+CASING_T = 11. / 16.
 APRON_W = 5.5
 
 BLOCK_W = CASING_SIDE_W
@@ -10,12 +13,11 @@ BLOCK_H = 11.
 STOOL_T = 1.125
 JAMB_T = 11./16.
 
-CROWN_D = 2.125 # Depth of crown moulding (used to determine extra material required for miter returns)
+CROWN_D = 2. + 1./16. # Depth of crown moulding (used to determine extra material required for miter returns)
 
 BEAD_T = 0.5
 
 REVEAL = 0.25   # Reveal left by casing on jamb
-CROWN_HANG = 1.5
 BEAD_HANG = 0.5
 STOOL_HANG = 0.5
 
@@ -76,8 +78,8 @@ class Opening(object):
     def crown(self):
         if not self.use_crown:
             return None
-        L = self._distance_across_casing() + 2 * CROWN_HANG
-        Lrough = L + 2 * CROWN_D
+        L = self._distance_across_casing() + 2 * (CROWN_D - CASING_T)
+        Lrough = L + 2 * CROWN_D + 0.5 # Adding a little extra for kerfs for miter return cuts
         return Part(L, rough=Lrough)
 
     def head(self):
@@ -159,85 +161,6 @@ class Door(Opening):
     def block(self):
         return Part(BLOCK_H, 2)
 
-class Cut(object):
-    def __init__(self, opening, name, length):
-        self.opening = opening
-        self.name = name
-        self.length = length
-
-    def __str__(self):
-        return f'{self.opening.name} {self.name} @ {self.length}'
-
-class Board(object):
-    def __init__(self, length, kerf):
-        self.length = length
-        self.kerf = kerf
-        self.cuts = []
-
-    @property
-    def excess(self):
-        return self.length - sum([c.length for c in self.cuts]) - self.kerf * len(self.cuts)
-
-class CutList(object):
-    def __init__(self, name, kerf):
-        self.name = name
-        self.kerf = kerf
-        self.boards = []
-
-    def new_board(self, length):
-        self.boards.append(Board(length, self.kerf))
-        return self.boards[-1]
-
-class CutListMaker(object):
-    def __init__(self, board_length, kerf=0.125, join=False):
-        self.board_length = board_length
-        self.kerf = kerf
-        self.join = join
-
-    def make(self, name, cuts):
-        cl = CutList(name, self.kerf)
-
-        j = 0
-        for c in list(cuts):
-            if (c.length + self.kerf) > self.board_length:
-                if self.join:
-                    # Split into multiple cuts
-                    nc = int(ceil((c.length + self.kerf) / self.board_length))
-                    name = c.name
-                    length = c.length
-                    for i in range(nc):
-                        clen = length if length < self.board_length else self.board_length - self.kerf
-                        length -= clen
-                        cuts.append(Cut(c.opening, f'{name} {i+1}/{nc}', clen))
-                    del cuts[j]
-                    j -= 1
-                else:
-                    raise Exception(f'Cut length greater than board length {c.length + self.kerf} > {self.board_length}')
-            j += 1
-
-        ncuts = len(cuts)
-        cut_made = [False] * ncuts
-
-        board = cl.new_board(self.board_length)
-
-        while not all(cut_made):
-            next_cut = None
-            next_cut_i = -1
-            for i in range(ncuts):
-                if cut_made[i]:
-                    continue
-                if (cuts[i].length + self.kerf) <= board.excess:
-                    if next_cut is None or cuts[i].length > next_cut.length:
-                        next_cut = cuts[i]
-                        next_cut_i = i
-            if next_cut is None:
-                board = cl.new_board(self.board_length)
-            else:
-                cut_made[next_cut_i] = True
-                board.cuts.append(next_cut)
-
-        return cl
-
 def house():
     ops = (
         Door('Front Door', 32.25, 80., has_jambs=True),
@@ -254,8 +177,8 @@ def house():
         Door('Back Door In', 31, 78.5, has_jambs=True),
         Door('Back Bed Door Out', 30.5, 79.5, has_jambs=True),
         Door('Back Bed Door In', 30.5, 79.5, has_jambs=True),
-        Door('Back Bed Closet East', 30.5, 80.),
-        Door('Back Bed Closet West', 30.5, 80.),
+        Door('Back Bed Closet East', 28.125, 80., has_jambs=True),
+        Door('Back Bed Closet West', 28.125, 80., has_jambs=True),
         Window('Back Bed Window West', 27., 41.25),
         Window('Back Bed Window North', 27., 41.25),
         Door('Stairwell Door (hall side)', 32., 80.25, has_jambs=True),
@@ -283,8 +206,8 @@ def house():
 
     for k, t in totals.items():
         feet = t / 12.
-        inches = round(12. * (feet - floor(feet)))
-        feet = floor(feet)
+        inches = round(12. * (feet - math.floor(feet)))
+        feet = math.floor(feet)
         print(f'{k}: {feet}\' {inches}"')
 
     # Create lists of unique cuts
@@ -297,24 +220,24 @@ def house():
                 kparts = parts.parts[k]
                 for p in kparts:
                     for i in range(p.count):
-                        c.append( Cut(o, k, ceil(p.rough) + 1.) )
+                        c.append( shophand.cutlist.Cut(o, k, math.ceil(p.rough) + 1.) )
 
-    clmkr = CutListMaker(16. * 12.)
+    clmkr = shophand.cutlist.CutListMaker(16. * 12.)
 
     cl_side = clmkr.make('Head Casing', cuts['head'])
     cl_head = clmkr.make('Side Casing', cuts['side'])
     cl_apron = clmkr.make('Apron', cuts['apron'])
     cl_block = clmkr.make('Block', cuts['block'])
 
-    clmkr = CutListMaker(10. * 12.)
+    clmkr = shophand.cutlist.CutListMaker(10. * 12.)
 
     cl_stool = clmkr.make('Stool', cuts['stool'])
 
-    clmkr = CutListMaker(8. * 12., join=True)
+    clmkr = shophand.cutlist.CutListMaker(8. * 12., join=True)
     
     cl_crown = clmkr.make('Crown', cuts['crown'])
 
-    clmkr = CutListMaker(8. * 12., join=True)
+    clmkr = shophand.cutlist.CutListMaker(8. * 12., join=True)
 
     cl_bead = clmkr.make('Bead', cuts['bead'])
 
