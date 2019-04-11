@@ -1,13 +1,13 @@
 import math
 
 class Cut(object):
-    def __init__(self, opening, name, length):
-        self.opening = opening
+    def __init__(self, where, name, length):
+        self.where = where
         self.name = name
         self.length = length
 
     def __str__(self):
-        return f'{self.opening.name} {self.name} @ {self.length}'
+        return f'{self.where} {self.name} @ {self.length}'
 
 class Board(object):
     def __init__(self, length, kerf):
@@ -49,7 +49,7 @@ class CutListMaker(object):
                     for i in range(nc):
                         clen = length if length < self.board_length else self.board_length - self.kerf
                         length -= clen
-                        cuts.append(Cut(c.opening, f'{name} {i+1}/{nc}', clen))
+                        cuts.append(Cut(c.where, f'{name} {i+1}/{nc}', clen))
                     del cuts[j]
                     j -= 1
                 else:
