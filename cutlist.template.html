@@ -42,7 +42,7 @@ body {
             <h1>{{ cutlist.name }} Cut List ({{ cutlist.boards|length }} Total Boards)</h1>
             {% for b in cutlist.boards %}
                 <h3>{{ b.length/12 }} ft (excess = {{ b.excess }} in)</h3>
-                <div class="board">
+                <div class="board" style="width: {{ 90 * b.length / cutlist.max_length }}%">
 
                     <ul>
                     {% for c in b.cuts %}
